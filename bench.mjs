@@ -1,37 +1,17 @@
-/**
- * Universal JS Benchmark for Serialization Libraries (using tinybench)
- * =================================================================
- * This script benchmarks the performance and payload size of various
- * MessagePack libraries against the native JSON implementation.
- *
- * It is designed to be runnable on Node.js, Deno, and Bun.
- *
- * --- How to Run ---
- *
- * Node.js:
- * node benchmark.mjs
- *
- * Deno:
- * deno run --allow-net --allow-read benchmark.mjs
- *
- * Bun:
- * bun run benchmark.mjs
- *
- */
-
 import assert from "node:assert";
 import { Bench, hrtimeNow } from "tinybench";
 
-// --- Library Imports ---
-// The following imports use specifiers compatible with Node, Deno, and Bun.
-
+import { XMLParser, XMLBuilder } from "fast-xml-parser";
 import * as YAML from "yaml";
-import * as stdMsgpack from "@std/msgpack";
-import * as stdToml from "@std/toml";
 import * as stdYaml from "@std/yaml";
-import * as msgpack from "@msgpack/msgpack";
+import * as stdToml from "@std/toml";
+
+import { encode as cbor2Encode, decode as cbor2Decode } from "cbor2";
 import * as msgpackr from "msgpackr";
-import protobuf from "protobufjs";
+import * as msgpack from "@msgpack/msgpack";
+import * as stdMsgpack from "@std/msgpack";
+import * as BSON from "bson";
+import * as ion from "ion-js";
 
 // --- Test Data ---
 
@@ -74,62 +54,27 @@ const createSampleData = (size) => {
 const sampleData10 = createSampleData(10);
 const sampleData100 = createSampleData(100);
 
-// --- Protobuf.js Specific Setup ---
-// Protobuf requires a schema and the data structure is more rigid.
-// We adapt the sample data to fit the schema.
-
-const protoSchema = `
-syntax = "proto3";
-
-message Sample {
-  string string = 1;
-  double number = 2;
-  sint32 integer = 3;
-  bool boolean = 4;
-
-  message ArrayItem {
-    int32 id = 1;
-    string name = 2;
-    double value = 3;
-    message Nested {
-      int32 a = 1;
-      string b = 2;
-    }
-    Nested nested = 4;
-  }
-
-  repeated ArrayItem array = 5;
-
-  map<string, ArrayItem> object = 6;
-  int64 date = 7;
-}
-`;
-
-const root = protobuf.parse(protoSchema).root;
-const Sample = root.lookupType("Sample");
+const xmlBuilder = new XMLBuilder();
+const xmlParser = new XMLParser();
 
 // --- Benchmark Configuration ---
 
 const benchmarkTargets = [
+  // --- Text-Based Formats ---
   {
     name: "JSON (baseline)",
     encode: (data) => JSON.stringify(data),
     decode: (encoded) => JSON.parse(encoded),
   },
   {
-    name: "YAML",
+    name: "fast-xml-parser",
+    encode: (data) => xmlBuilder.build({ root: data }),
+    decode: (encoded) => xmlParser.parse(encoded).root,
+  },
+  {
+    name: "yaml",
     encode: (data) => YAML.stringify(data),
     decode: (encoded) => YAML.parse(encoded),
-  },
-  {
-    name: "@std/msgpack",
-    encode: (data) => stdMsgpack.encode(data),
-    decode: (encoded) => stdMsgpack.decode(encoded),
-  },
-  {
-    name: "@std/toml",
-    encode: (data) => stdToml.stringify(data),
-    decode: (encoded) => stdToml.parse(encoded),
   },
   {
     name: "@std/yaml",
@@ -137,9 +82,20 @@ const benchmarkTargets = [
     decode: (encoded) => stdYaml.parse(encoded),
   },
   {
-    name: "@msgpack/msgpack",
-    encode: (data) => msgpack.encode(data),
-    decode: (encoded) => msgpack.decode(encoded),
+    name: "@std/toml",
+    encode: (data) => stdToml.stringify(data),
+    decode: (encoded) => stdToml.parse(encoded),
+  },
+  {
+    name: "ion-text",
+    encode: (data) => ion.dumpText(data),
+    decode: (encoded) => ion.load(encoded),
+  },
+  // --- Binary Formats ---
+  {
+    name: "cbor2",
+    encode: (data) => cbor2Encode(data),
+    decode: (encoded) => cbor2Decode(encoded),
   },
   {
     name: "msgpackr",
@@ -147,14 +103,24 @@ const benchmarkTargets = [
     decode: (encoded) => msgpackr.unpack(encoded),
   },
   {
-    name: "protobufjs",
-    encode: (data) => {
-      const message = Sample.create(data);
-      return Sample.encode(message).finish();
-    },
-    decode: (encoded) => {
-      return Sample.decode(encoded);
-    },
+    name: "@msgpack/msgpack",
+    encode: (data) => msgpack.encode(data),
+    decode: (encoded) => msgpack.decode(encoded),
+  },
+  {
+    name: "@std/msgpack",
+    encode: (data) => stdMsgpack.encode(data),
+    decode: (encoded) => stdMsgpack.decode(encoded),
+  },
+  {
+    name: "bson",
+    encode: (data) => BSON.serialize(data),
+    decode: (encoded) => BSON.deserialize(encoded),
+  },
+  {
+    name: "ion-binary",
+    encode: (data) => ion.dumpBinary(data),
+    decode: (encoded) => ion.load(encoded),
   },
 ];
 
@@ -171,15 +137,45 @@ async function main() {
         const encoded = lib.encode(sampleData);
         const decoded = lib.decode(encoded);
 
-        assert.ok(decoded, `${lib.name} failed to decode.`);
-        assert.strictEqual(
-          decoded.string,
-          sampleData.string,
-          `${lib.name} data mismatch`
-        );
+        // Custom assertion for XML as it might have type differences
+        if (lib.name === "fast-xml-parser") {
+          assert.ok(decoded, `${lib.name} failed to decode.`);
+          assert.strictEqual(
+            decoded.string,
+            sampleData.string,
+            `${lib.name} data mismatch on string`
+          );
+          // XML parsing may convert numbers, so we compare them loosely
+          assert.ok(
+            Math.abs(decoded.number - sampleData.number) < 1e-9,
+            `${lib.name} data mismatch on number`
+          );
+        } else if (lib.name === "ion-text" || lib.name === "ion-binary") {
+          // Ion decodes to object wrappers, requiring conversion before strict assertion.
+          assert.ok(decoded, `${lib.name} failed to decode.`);
+          assert.strictEqual(
+            decoded.string.toString(), // Convert String object to primitive
+            sampleData.string,
+            `${lib.name} data mismatch on string`
+          );
+          assert.strictEqual(
+            decoded.array[0].name.toString(), // Convert String object to primitive
+            sampleData.array[0].name,
+            `${lib.name} data mismatch on array content`
+          );
+        } else {
+          // For other formats, a deep strict equal should work
+          assert.deepStrictEqual(
+            decoded,
+            sampleData,
+            `${lib.name} data mismatch`
+          );
+        }
 
         console.log(
-          `[${lib.name.padEnd(18)}] Size: ${(encoded.length || encoded.byteLength)
+          `[${lib.name.padEnd(18)}] Size: ${(
+            encoded.length || encoded.byteLength
+          )
             .toString()
             .padStart(5)} bytes ✅`
         );
@@ -194,7 +190,7 @@ async function main() {
     console.log("-------------------------------------\n");
 
     // 2. Performance Benchmarks with tinybench
-    const bench = new Bench({ now: hrtimeNow });
+    const bench = new Bench({ time: 200, iterations: 100, now: hrtimeNow });
     const runnableTargets = benchmarkTargets.filter((lib) => !lib.skip);
 
     for (const lib of runnableTargets) {
