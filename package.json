@@ -2,22 +2,25 @@
   "name": "msgpack-bench",
   "version": "1.0.0",
   "description": "",
+  "keywords": [],
+  "license": "ISC",
+  "author": "",
   "main": "index.js",
   "scripts": {
     "format": "prettier . -w"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.13.1",
   "dependencies": {
     "@msgpack/msgpack": "^3.1.2",
     "@std/msgpack": "jsr:^1.0.3",
+    "@std/toml": "jsr:^1.0.8",
+    "@std/yaml": "jsr:^1.0.8",
     "msgpackr": "^1.11.4",
     "protobufjs": "^7.5.3",
-    "tinybench": "^4.0.1"
+    "tinybench": "^4.0.1",
+    "yaml": "^2.8.0"
   },
   "devDependencies": {
     "prettier": "^3.6.2"
-  }
+  },
+  "packageManager": "pnpm@10.13.1"
 }

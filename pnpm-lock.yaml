@@ -14,6 +14,12 @@ importers:
       '@std/msgpack':
         specifier: jsr:^1.0.3
         version: '@jsr/std__msgpack@1.0.3'
+      '@std/toml':
+        specifier: jsr:^1.0.8
+        version: '@jsr/std__toml@1.0.8'
+      '@std/yaml':
+        specifier: jsr:^1.0.8
+        version: '@jsr/std__yaml@1.0.8'
       msgpackr:
         specifier: ^1.11.4
         version: 1.11.4
@@ -23,6 +29,9 @@ importers:
       tinybench:
         specifier: ^4.0.1
         version: 4.0.1
+      yaml:
+        specifier: ^2.8.0
+        version: 2.8.0
     devDependencies:
       prettier:
         specifier: ^3.6.2
@@ -33,8 +42,17 @@ packages:
   '@jsr/std__bytes@1.0.6':
     resolution: {integrity: sha512-St6yKggjFGhxS52IFLJWvkchRFbAKg2Xh8UxA4S1EGz7GJ2Ui+ssDDldj/w2c8vCxvl6qgR0HaYbKeFJNqujmA==, tarball: https://npm.jsr.io/~/11/@jsr/std__bytes/1.0.6.tgz}
 
+  '@jsr/std__collections@1.1.2':
+    resolution: {integrity: sha512-Fen3UrxGCxzra/QGhv6DNEKkzV6OCmWhN090iUF6Q4HRXYsSz9YoFnKci53QPXKnIlaBdha70QiSZDi127OKfQ==, tarball: https://npm.jsr.io/~/11/@jsr/std__collections/1.1.2.tgz}
+
   '@jsr/std__msgpack@1.0.3':
     resolution: {integrity: sha512-7gmGq3SxDZ+oHS5w7Qc6NA4YgzLyXBaZzeF6Uh6Rq+SSzG/8mOEkA73qPZiNrThfaMjbk93JduIoGjxv9iUD0w==, tarball: https://npm.jsr.io/~/11/@jsr/std__msgpack/1.0.3.tgz}
+
+  '@jsr/std__toml@1.0.8':
+    resolution: {integrity: sha512-rnMoiySl30TrsdnfKcroYEWIBlmPvdNoA8fn/Njy3rsZR9C8k5nUeo9kWP/D/PhxYlUaYPtmQ31YhNqGpmEZ3Q==, tarball: https://npm.jsr.io/~/11/@jsr/std__toml/1.0.8.tgz}
+
+  '@jsr/std__yaml@1.0.8':
+    resolution: {integrity: sha512-iLe84pvIEtG7EFKxP5fIQn7CFQle7gzkb6KSPqf9zkyR2NVViSJjK8xbXg82SUEFSmpdY18qCGpVEnTG3oRMVg==, tarball: https://npm.jsr.io/~/11/@jsr/std__yaml/1.0.8.tgz}
 
   '@msgpack/msgpack@3.1.2':
     resolution: {integrity: sha512-JEW4DEtBzfe8HvUYecLU9e6+XJnKDlUAIve8FvPzF3Kzs6Xo/KuZkZJsDH0wJXl/qEZbeeE7edxDNY3kMs39hQ==}
@@ -137,13 +155,26 @@ packages:
   undici-types@7.8.0:
     resolution: {integrity: sha512-9UJ2xGDvQ43tYyVMpuHlsgApydB8ZKfVYTsLDhXkFL/6gfkp+U8xTGdh8pMJv1SpZna0zxG1DwsKZsreLbXBxw==}
 
+  yaml@2.8.0:
+    resolution: {integrity: sha512-4lLa/EcQCB0cJkyts+FpIRx5G/llPxfP6VQU5KByHEhLxY3IJCH0f0Hy1MHI8sClTvsIb8qwRJ6R/ZdlDJ/leQ==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
 snapshots:
 
   '@jsr/std__bytes@1.0.6': {}
 
+  '@jsr/std__collections@1.1.2': {}
+
   '@jsr/std__msgpack@1.0.3':
     dependencies:
       '@jsr/std__bytes': 1.0.6
+
+  '@jsr/std__toml@1.0.8':
+    dependencies:
+      '@jsr/std__collections': 1.1.2
+
+  '@jsr/std__yaml@1.0.8': {}
 
   '@msgpack/msgpack@3.1.2': {}
 
@@ -238,3 +269,5 @@ snapshots:
   tinybench@4.0.1: {}
 
   undici-types@7.8.0: {}
+
+  yaml@2.8.0: {}

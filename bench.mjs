@@ -25,33 +25,54 @@ import { Bench, hrtimeNow } from "tinybench";
 // --- Library Imports ---
 // The following imports use specifiers compatible with Node, Deno, and Bun.
 
-import { decode as stdDecode, encode as stdEncode } from "@std/msgpack";
-
-import {
-  decode as msgpackDecode,
-  encode as msgpackEncode,
-} from "@msgpack/msgpack";
-
-import { pack, unpack } from "msgpackr";
+import * as YAML from "yaml";
+import * as stdMsgpack from "@std/msgpack";
+import * as stdToml from "@std/toml";
+import * as stdYaml from "@std/yaml";
+import * as msgpack from "@msgpack/msgpack";
+import * as msgpackr from "msgpackr";
 import protobuf from "protobufjs";
 
 // --- Test Data ---
 
-const sampleData = {
-  string: "Hello, this is a benchmark for various serialization libraries! 🦖",
-  number: Math.PI * 1000,
-  integer: -1234567,
-  boolean: true,
-  nil: null,
-  array: [1, "two", true, null, { nested: true, value: 100 }],
-  object: {
-    a: 1,
-    b: "2",
-    c: { d: 4, e: 5 },
-  },
-  date: Date.now(),
-  binary: new Uint8Array(Array.from({ length: 128 }, (_, i) => i)),
+const createSampleData = (size) => {
+  const sampleData = {
+    string:
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+    number: Math.PI * 1000 * Math.random(),
+    integer: Math.floor(Math.random() * -1000000),
+    boolean: true,
+    array: [],
+    object: {},
+    date: Date.now(),
+  };
+
+  for (let i = 0; i < size; i++) {
+    sampleData.array.push({
+      id: i,
+      name: `item-${i}`,
+      value: Math.random(),
+      nested: {
+        a: i * 2,
+        b: `nested-${i}`,
+      },
+    });
+    sampleData.object[`key-${i}`] = {
+      id: i,
+      name: `item-${i}`,
+      value: Math.random(),
+      nested: {
+        a: i * 2,
+        b: `nested-${i}`,
+      },
+    };
+  }
+
+  return sampleData;
 };
+
+const sampleData10 = createSampleData(10);
+const sampleData100 = createSampleData(100);
 
 // --- Protobuf.js Specific Setup ---
 // Protobuf requires a schema and the data structure is more rigid.
@@ -67,92 +88,72 @@ message Sample {
   bool boolean = 4;
 
   message ArrayItem {
-    oneof item {
-      int32 integer = 1;
-      string string = 2;
-      bool boolean = 3;
-      Nested nested = 4;
+    int32 id = 1;
+    string name = 2;
+    double value = 3;
+    message Nested {
+      int32 a = 1;
+      string b = 2;
     }
-  }
-
-  message Nested {
-    bool nested = 1;
-    int32 value = 2;
+    Nested nested = 4;
   }
 
   repeated ArrayItem array = 5;
 
-  message Object {
-    int32 a = 1;
-    string b = 2;
-    message C {
-      int32 d = 1;
-      int32 e = 2;
-    }
-    C c = 3;
-  }
-  Object object = 6;
+  map<string, ArrayItem> object = 6;
   int64 date = 7;
-  bytes binary = 8;
 }
 `;
 
 const root = protobuf.parse(protoSchema).root;
 const Sample = root.lookupType("Sample");
 
-// Create a version of sampleData that fits the protobuf schema
-const protobufSampleData = {
-  ...sampleData,
-  nil: undefined, // Protobuf doesn't have null
-  array: [
-    { integer: 1 },
-    { string: "two" },
-    { boolean: true },
-    { nested: { nested: true, value: 100 } },
-  ],
-};
-
 // --- Benchmark Configuration ---
 
 const benchmarkTargets = [
   {
     name: "JSON (baseline)",
-    data: sampleData,
     encode: (data) => JSON.stringify(data),
     decode: (encoded) => JSON.parse(encoded),
   },
   {
+    name: "YAML",
+    encode: (data) => YAML.stringify(data),
+    decode: (encoded) => YAML.parse(encoded),
+  },
+  {
     name: "@std/msgpack",
-    data: sampleData,
-    encode: (data) => stdEncode(data),
-    decode: (encoded) => stdDecode(encoded),
+    encode: (data) => stdMsgpack.encode(data),
+    decode: (encoded) => stdMsgpack.decode(encoded),
+  },
+  {
+    name: "@std/toml",
+    encode: (data) => stdToml.stringify(data),
+    decode: (encoded) => stdToml.parse(encoded),
+  },
+  {
+    name: "@std/yaml",
+    encode: (data) => stdYaml.stringify(data),
+    decode: (encoded) => stdYaml.parse(encoded),
   },
   {
     name: "@msgpack/msgpack",
-    data: sampleData,
-    encode: (data) => msgpackEncode(data),
-    decode: (encoded) => msgpackDecode(encoded),
+    encode: (data) => msgpack.encode(data),
+    decode: (encoded) => msgpack.decode(encoded),
   },
   {
     name: "msgpackr",
-    data: sampleData,
-    encode: (data) => pack(data),
-    decode: (encoded) => unpack(encoded),
+    encode: (data) => msgpackr.pack(data),
+    decode: (encoded) => msgpackr.unpack(encoded),
   },
   {
     name: "protobufjs",
-    data: protobufSampleData,
     encode: (data) => {
       const message = Sample.create(data);
       return Sample.encode(message).finish();
     },
     decode: (encoded) => {
-      const decodedMessage = Sample.decode(encoded);
-      // Convert back to a plain object for assertion and consistency
-      return Sample.toObject(decodedMessage, {
-        longs: Number, // For date/timestamp
-        defaults: true, // Include default values
-      });
+      return Sample.decode(encoded);
     },
   },
 ];
@@ -160,52 +161,56 @@ const benchmarkTargets = [
 // --- Main Execution ---
 
 async function main() {
-  // 1. Payload Size and Verification
-  console.log("--- Payload Size and Verification ---");
-  for (const lib of benchmarkTargets) {
-    try {
-      const encoded = lib.encode(lib.data);
-      const decoded = lib.decode(encoded);
+  const dataSizes = [10, 100];
 
-      assert.ok(decoded, `${lib.name} failed to decode.`);
-      assert.strictEqual(
-        decoded.string,
-        lib.data.string,
-        `${lib.name} data mismatch`,
-      );
+  for (const size of dataSizes) {
+    const sampleData = size === 10 ? sampleData10 : sampleData100;
+    console.log(`--- Payload Size and Verification (size: ${size}) ---`);
+    for (const lib of benchmarkTargets) {
+      try {
+        const encoded = lib.encode(sampleData);
+        const decoded = lib.decode(encoded);
 
-      console.log(
-        `[${lib.name.padEnd(18)}] Size: ${(encoded.length || encoded.byteLength)
-          .toString()
-          .padStart(5)} bytes ✅`,
-      );
-      // Store encoded data for the decode benchmark
-      lib.encoded = encoded;
-    } catch (error) {
-      console.log(`[${lib.name.padEnd(18)}] SKIPPED due to error ❌`);
-      console.error(`Error with library ${lib.name}:`, error.message);
-      lib.skip = true;
+        assert.ok(decoded, `${lib.name} failed to decode.`);
+        assert.strictEqual(
+          decoded.string,
+          sampleData.string,
+          `${lib.name} data mismatch`
+        );
+
+        console.log(
+          `[${lib.name.padEnd(18)}] Size: ${(encoded.length || encoded.byteLength)
+            .toString()
+            .padStart(5)} bytes ✅`
+        );
+        // Store encoded data for the decode benchmark
+        lib.encoded = encoded;
+      } catch (error) {
+        console.log(`[${lib.name.padEnd(18)}] SKIPPED due to error ❌`);
+        console.error(`Error with library ${lib.name}:`, error.message);
+        lib.skip = true;
+      }
     }
+    console.log("-------------------------------------\n");
+
+    // 2. Performance Benchmarks with tinybench
+    const bench = new Bench({ now: hrtimeNow });
+    const runnableTargets = benchmarkTargets.filter((lib) => !lib.skip);
+
+    for (const lib of runnableTargets) {
+      bench.add(`${lib.name} - Encode (size: ${size})`, () => {
+        lib.encode(sampleData);
+      });
+      bench.add(`${lib.name} - Decode (size: ${size})`, () => {
+        lib.decode(lib.encoded);
+      });
+    }
+
+    await bench.run();
+
+    console.log(`--- Benchmark Results (size: ${size}) ---`);
+    console.table(bench.table());
   }
-  console.log("-------------------------------------\n");
-
-  // 2. Performance Benchmarks with tinybench
-  const bench = new Bench({ now: hrtimeNow });
-  const runnableTargets = benchmarkTargets.filter((lib) => !lib.skip);
-
-  for (const lib of runnableTargets) {
-    bench.add(`${lib.name} - Encode`, () => {
-      lib.encode(lib.data);
-    });
-    bench.add(`${lib.name} - Decode`, () => {
-      lib.decode(lib.encoded);
-    });
-  }
-
-  await bench.run();
-
-  console.log("--- Benchmark Results ---");
-  console.table(bench.table());
 }
 
 main().catch(console.error);
