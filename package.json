@@ -15,11 +15,13 @@
     "@std/toml": "jsr:^1.0.8",
     "@std/yaml": "jsr:^1.0.8",
     "bson": "^6.10.4",
+    "cbor-x": "^1.6.0",
     "cbor2": "^2.0.1",
     "fast-xml-parser": "^5.2.5",
     "ion-js": "^5.2.1",
     "msgpackr": "^1.11.4",
     "protobufjs": "^7.5.3",
+    "smol-toml": "^1.4.1",
     "tinybench": "^4.0.1",
     "yaml": "^2.8.0"
   },

@@ -2,14 +2,16 @@ import assert from "node:assert";
 import { Bench, hrtimeNow } from "tinybench";
 
 import { XMLParser, XMLBuilder } from "fast-xml-parser";
-import * as YAML from "yaml";
+import * as yaml from "yaml";
 import * as stdYaml from "@std/yaml";
+import * as smolToml from "smol-toml";
 import * as stdToml from "@std/toml";
 
-import { encode as cbor2Encode, decode as cbor2Decode } from "cbor2";
-import * as msgpackr from "msgpackr";
 import * as msgpack from "@msgpack/msgpack";
+import * as msgpackr from "msgpackr";
 import * as stdMsgpack from "@std/msgpack";
+import * as cbor2 from "cbor2";
+import * as cborX from "cbor-x";
 import * as BSON from "bson";
 import * as ion from "ion-js";
 
@@ -73,13 +75,18 @@ const benchmarkTargets = [
   },
   {
     name: "yaml",
-    encode: (data) => YAML.stringify(data),
-    decode: (encoded) => YAML.parse(encoded),
+    encode: (data) => yaml.stringify(data),
+    decode: (encoded) => yaml.parse(encoded),
   },
   {
     name: "@std/yaml",
     encode: (data) => stdYaml.stringify(data),
     decode: (encoded) => stdYaml.parse(encoded),
+  },
+  {
+    name: "smol-toml",
+    encode: (data) => smolToml.stringify(data),
+    decode: (encoded) => smolToml.parse(encoded),
   },
   {
     name: "@std/toml",
@@ -93,9 +100,9 @@ const benchmarkTargets = [
   },
   // --- Binary Formats ---
   {
-    name: "cbor2",
-    encode: (data) => cbor2Encode(data),
-    decode: (encoded) => cbor2Decode(encoded),
+    name: "@msgpack/msgpack",
+    encode: (data) => msgpack.encode(data),
+    decode: (encoded) => msgpack.decode(encoded),
   },
   {
     name: "msgpackr",
@@ -103,14 +110,19 @@ const benchmarkTargets = [
     decode: (encoded) => msgpackr.unpack(encoded),
   },
   {
-    name: "@msgpack/msgpack",
-    encode: (data) => msgpack.encode(data),
-    decode: (encoded) => msgpack.decode(encoded),
-  },
-  {
     name: "@std/msgpack",
     encode: (data) => stdMsgpack.encode(data),
     decode: (encoded) => stdMsgpack.decode(encoded),
+  },
+  {
+    name: "cbor2",
+    encode: (data) => cbor2.encode(data),
+    decode: (encoded) => cbor2.decode(encoded),
+  },
+  {
+    name: "cbor-x",
+    encode: (data) => cborX.encode(data),
+    decode: (encoded) => cborX.decode(encoded),
   },
   {
     name: "bson",
