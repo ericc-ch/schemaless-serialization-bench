@@ -33,6 +33,7 @@ import {
 } from "@msgpack/msgpack";
 
 import { pack, unpack } from "msgpackr";
+import protobuf from "protobufjs";
 
 // --- Test Data ---
 
@@ -50,6 +51,65 @@ const sampleData = {
   },
   date: Date.now(),
   binary: new Uint8Array(Array.from({ length: 128 }, (_, i) => i)),
+};
+
+// --- Protobuf.js Specific Setup ---
+// Protobuf requires a schema and the data structure is more rigid.
+// We adapt the sample data to fit the schema.
+
+const protoSchema = `
+syntax = "proto3";
+
+message Sample {
+  string string = 1;
+  double number = 2;
+  sint32 integer = 3;
+  bool boolean = 4;
+
+  message ArrayItem {
+    oneof item {
+      int32 integer = 1;
+      string string = 2;
+      bool boolean = 3;
+      Nested nested = 4;
+    }
+  }
+
+  message Nested {
+    bool nested = 1;
+    int32 value = 2;
+  }
+
+  repeated ArrayItem array = 5;
+
+  message Object {
+    int32 a = 1;
+    string b = 2;
+    message C {
+      int32 d = 1;
+      int32 e = 2;
+    }
+    C c = 3;
+  }
+  Object object = 6;
+  int64 date = 7;
+  bytes binary = 8;
+}
+`;
+
+const root = protobuf.parse(protoSchema).root;
+const Sample = root.lookupType("Sample");
+
+// Create a version of sampleData that fits the protobuf schema
+const protobufSampleData = {
+  ...sampleData,
+  nil: undefined, // Protobuf doesn't have null
+  array: [
+    { integer: 1 },
+    { string: "two" },
+    { boolean: true },
+    { nested: { nested: true, value: 100 } },
+  ],
 };
 
 // --- Benchmark Configuration ---
@@ -79,6 +139,22 @@ const benchmarkTargets = [
     encode: (data) => pack(data),
     decode: (encoded) => unpack(encoded),
   },
+  {
+    name: "protobufjs",
+    data: protobufSampleData,
+    encode: (data) => {
+      const message = Sample.create(data);
+      return Sample.encode(message).finish();
+    },
+    decode: (encoded) => {
+      const decodedMessage = Sample.decode(encoded);
+      // Convert back to a plain object for assertion and consistency
+      return Sample.toObject(decodedMessage, {
+        longs: Number, // For date/timestamp
+        defaults: true, // Include default values
+      });
+    },
+  },
 ];
 
 // --- Main Execution ---
@@ -95,13 +171,13 @@ async function main() {
       assert.strictEqual(
         decoded.string,
         lib.data.string,
-        `${lib.name} data mismatch`
+        `${lib.name} data mismatch`,
       );
 
       console.log(
-        `[${lib.name.padEnd(18)}] Size: ${encoded.length
+        `[${lib.name.padEnd(18)}] Size: ${(encoded.length || encoded.byteLength)
           .toString()
-          .padStart(5)} bytes ✅`
+          .padStart(5)} bytes ✅`,
       );
       // Store encoded data for the decode benchmark
       lib.encoded = encoded;
